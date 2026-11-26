@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frohe Weihnachten 🎄</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden;
+    background: radial-gradient(circle at 50% 40%, #0b2545 0%, #020814 75%); }
+  canvas { display:block; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ===== Hier kannst du anpassen =====
+const GRUSS = "Frohe Weihnachten";
+const DREHTEMPO = 0.5;     // höher = dreht schneller
+const AUFBAU = 6;          // Sekunden, bis der Baum fertig ist
+const SCHNEE = 220;        // Anzahl Schneeflocken
+// ===================================
+
+const c = document.getElementById("c"), x = c.getContext("2d");
+let W, H, S, start = performance.now();
+const r = (a, b) => a + Math.random() * (b - a);
+
+// Baum: Koordinaten h = 0 (Spitze) bis 1 (unten)
+const nadeln = [];
+for (let i = 0; i < 1100; i++) {
+  const h = Math.sqrt(Math.random());
+  const stufe = (h * 5) % 1;                       // 5 Etagen
+  const radius = h * (0.62 + 0.38 * stufe) * r(0.75, 1);
+  nadeln.push({ h, radius, w: r(0, Math.PI * 2),
+    z: Math.random() < 0.5 ? "0" : "1",
+    ton: r(35, 65), wechsel: r(0.2, 1.5), naechst: 0 });
+}
+// Lichterkette als Spirale
+const lichter = [];
+for (let i = 0; i < 90; i++) {
+  const h = 0.08 + 0.9 * i / 90;
+  const stufe = (h * 5) % 1;
+  lichter.push({ h, radius: h * (0.64 + 0.38 * stufe), w: h * Math.PI * 11,
+    farbe: ["#ff3b3b", "#ffd23b", "#3bb8ff", "#ff6bf0"][i % 4], i });
+}
+const flocken = Array.from({ length: SCHNEE }, () => ({
+  x: Math.random(), y: Math.random(), g: r(1, 3.5), v: r(0.03, 0.1), p: r(0, 6) }));
+
+// Geschenke: Position, Breite, Höhe (relativ), Farbe, Band
+const geschenke = [
+  [-0.78, 0.26, 0.20, "#c1121f", "#ffd60a"],
+  [-0.42, 0.20, 0.27, "#1d4ed8", "#e5e7eb"],
+  [ 0.40, 0.30, 0.18, "#7b2cbf", "#ffd60a"],
+  [ 0.76, 0.22, 0.23, "#d97706", "#c1121f"],
+  [-0.12, 0.18, 0.13, "#0f766e", "#ff8fab"]
+];
+
+function groesse() {
+  const d = window.devicePixelRatio || 1;
+  W = innerWidth; H = innerHeight;
+  c.width = W * d; c.height = H * d;
+  c.style.width = W + "px"; c.style.height = H + "px";
+  x.setTransform(d, 0, 0, d, 0, 0);
+  S = Math.min(W * 1.15, H * 0.75);               // Baumgröße
+}
+
+function stern(cx, cy, R, dreh) {
+  x.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? R * 0.45 : R;
+    x.lineTo(cx + Math.cos(a) * q * dreh, cy + Math.sin(a) * q);
+  }
+  x.closePath(); x.fill();
+}
+
+function bild(jetzt) {
+  const t = (jetzt - start) / 1000;
+  x.clearRect(0, 0, W, H);
+  const mitte = W / 2, oben = H / 2 - S * 0.54, hoehe = S * 0.86;
+  const breite = S * 0.36, boden = oben + hoehe + S * 0.2;
+  const fortschritt = Math.min(t / AUFBAU, 1);
+
+  // Schneeboden
+  x.shadowBlur = 0;
+  x.globalAlpha = 0.18; x.fillStyle = "#dbeafe";
+  x.beginPath(); x.ellipse(mitte, boden, S * 0.55, S * 0.045, 0, 0, 7); x.fill();
+  x.globalAlpha = 1;
+
+  // Stamm
+  x.fillStyle = "#5c3a21";
+  x.fillRect(mitte - S * 0.04, oben + hoehe, S * 0.08, S * 0.19);
+
+  // Nadeln und Lichter in 3D, hinten zuerst
+  const teile = [...nadeln, ...lichter].map(p => {
+    const a = p.w + t * DREHTEMPO;
+    const tiefe = Math.sin(a) * p.radius;
+    return { p, tiefe,
+      px: mitte + Math.cos(a) * p.radius * breite,
+      py: oben + p.h * hoehe + tiefe * breite * 0.18 };
+  }).sort((a, b) => a.tiefe - b.tiefe);
+
+  x.textAlign = "center"; x.textBaseline = "middle";
+  for (const { p, tiefe, px, py } of teile) {
+    if (1 - p.h > fortschritt) continue;           // baut sich von unten auf
+    const nah = (tiefe + 1) / 2;
+    x.globalAlpha = 0.3 + 0.7 * nah;
+    if (p.z) {
+      if (t > p.naechst) { p.z = Math.random() < 0.5 ? "0" : "1"; p.naechst = t + p.wechsel; }
+      x.font = `bold ${S * (0.018 + 0.014 * nah)}px monospace`;
+      x.fillStyle = `hsl(140, 80%, ${p.ton * (0.6 + 0.4 * nah)}%)`;
+      x.shadowBlur = 0;
+      x.fillText(p.z, px, py);
+    } else {
+      const blink = 0.5 + 0.5 * Math.sin(t * 4 + p.i * 1.7);
+      x.fillStyle = x.shadowColor = p.farbe;
+      x.shadowBlur = 6 + 14 * blink;
+      x.beginPath(); x.arc(px, py, S * 0.006 * (0.7 + nah * 0.5 + blink * 0.3), 0, 7); x.fill();
+    }
+  }
+  x.globalAlpha = 1;
+
+  // Stern an der Spitze
+  if (fortschritt >= 1) {
+    x.fillStyle = "#ffe066"; x.shadowColor = "#ffd60a";
+    x.shadowBlur = 25 + 12 * Math.sin(t * 3);
+    stern(mitte, oben - S * 0.015, S * 0.05, 0.35 + 0.65 * Math.abs(Math.cos(t * 1.5)));
+  }
+
+  // Geschenke hüpfen nacheinander rein
+  x.shadowBlur = 0;
+  geschenke.forEach(([pos, b, h, farbe, band], i) => {
+    const f = Math.min(Math.max((t - AUFBAU * 0.6 - i * 0.4) / 0.9, 0), 1);
+    if (!f) return;
+    const sprung = Math.abs(Math.cos(f * Math.PI * 2.5)) * (1 - f) * S * 0.25;
+    const bb = b * S * 0.6, hh = h * S * 0.6;
+    const gx = mitte + pos * S * 0.42 - bb / 2, gy = boden - hh - sprung + S * 0.01;
+    x.fillStyle = farbe; x.fillRect(gx, gy, bb, hh);
+    x.fillStyle = band;
+    x.fillRect(gx + bb * 0.43, gy, bb * 0.14, hh);
+    x.fillRect(gx, gy, bb, hh * 0.14);
+    x.strokeStyle = band; x.lineWidth = S * 0.007;
+    for (const seite of [-1, 1]) {                  // Schleife
+      x.beginPath();
+      x.ellipse(gx + bb / 2 + seite * bb * 0.13, gy - hh * 0.09, bb * 0.13, hh * 0.09, seite * 0.4, 0, 7);
+      x.stroke();
+    }
+  });
+
+  // Schnee
+  x.fillStyle = "#fff";
+  for (const f of flocken) {
+    const fy = ((f.y + t * f.v) % 1) * H;
+    const fx = f.x * W + Math.sin(t + f.p) * 18;
+    x.globalAlpha = 0.35 + f.g / 6;
+    x.beginPath(); x.arc(fx, fy, f.g, 0, 7); x.fill();
+  }
+
+  // Gruß
+  x.globalAlpha = Math.min(Math.max((t - AUFBAU) / 2, 0), 1);
+  let schrift = S * 0.08;
+  x.font = `italic bold ${schrift}px Georgia, serif`;
+  schrift *= Math.min(1, W * 0.9 / x.measureText(GRUSS).width);
+  x.font = `italic bold ${schrift}px Georgia, serif`;
+  x.shadowColor = "#ff3b3b"; x.shadowBlur = 20;
+  x.fillText(GRUSS, mitte, Math.min(boden + S * 0.1, H - schrift));
+  x.globalAlpha = 1; x.shadowBlur = 0;
+
+  requestAnimationFrame(bild);
+}
+
+addEventListener("resize", groesse);
+c.addEventListener("click", () => start = performance.now());  // Klick = Neustart
+groesse();
+requestAnimationFrame(bild);
+</script>
+</body>
+</html>
