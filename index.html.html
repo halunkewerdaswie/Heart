@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ich liebe dich ❤</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #2a0718 0%, #07010a 75%);
+  }
+  canvas { display: block; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ===== Hier kannst du anpassen =====
+const MITTE = "Ich liebe dich, Delia";  // großer Text in der Mitte, z.B. "Ich liebe dich, Delia"
+const DAUER = 30;                      // Sekunden, bis das Herz fertig ist
+const FARBEN = ["#ff2d6f", "#ff5c8a", "#ff85a1", "#ffb3c6", "#ff4d6d", "#ffd6e0"];
+
+const WORTE = [
+  "Ich liebe dich", "I love you", "Je t'aime", "Te amo", "Te quiero", "Ti amo",
+  "Eu te amo", "Ik hou van jou", "Jeg elsker dig", "Jeg elsker deg",
+  "Jag älskar dig", "Ég elska þig", "Minä rakastan sinua", "Ma armastan sind",
+  "Es tevi mīlu", "Aš tave myliu", "Kocham cię", "Miluji tě", "Ľúbim ťa",
+  "Szeretlek", "Te iubesc", "Volim te", "Ljubim te", "Обичам те", "Те сакам",
+  "Я тебя люблю", "Я тебе кохаю", "Σ' αγαπώ", "Të dua", "Seni seviyorum",
+  "Səni sevirəm", "Мен сені сүйемін", "Ez ji te hez dikim", "אני אוהב אותך",
+  "أحبك", "دوستت دارم", "मैं तुमसे प्यार करता हूँ", "আমি তোমাকে ভালোবাসি",
+  "நான் உன்னை காதலிக்கிறேன்", "ฉันรักเธอ", "Anh yêu em", "Aku cinta kamu",
+  "Saya cintakan awak", "Mahal kita", "我爱你", "愛してる", "사랑해",
+  "Nakupenda", "Ek is lief vir jou", "Ngiyakuthanda", "Aloha wau iā ʻoe",
+  "T'estimo", "Maite zaitut", "Quérote", "Rwy'n dy garu di", "Mi amas vin"
+];
+// ===================================
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+let W, H, teile = [], start = 0;
+
+// Klassische Herzformel
+function herzPunkt(t) {
+  return {
+    x: 16 * Math.sin(t) ** 3,
+    y: -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t))
+  };
+}
+
+// Punkte mit gleichem Abstand auf der Herzlinie, damit nichts klumpt
+function gleichmaessig(anzahl) {
+  const fein = [];
+  let laenge = 0, alt = herzPunkt(0);
+  for (let i = 0; i <= 1000; i++) {
+    const p = herzPunkt((i / 1000) * Math.PI * 2);
+    laenge += Math.hypot(p.x - alt.x, p.y - alt.y);
+    fein.push({ ...p, l: laenge });
+    alt = p;
+  }
+  return Array.from({ length: anzahl }, (_, i) =>
+    fein.find(p => p.l >= (i + 0.5) / anzahl * laenge));
+}
+
+const zufall = (a, b) => a + Math.random() * (b - a);
+
+function aufbauen() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const s = Math.min(W / 37, H / 35);   // Herzgröße
+  const klein = Math.max(7, s * 0.58);  // Schriftgröße
+  teile = [];
+
+  // Ringe von außen nach innen
+  const ringe = [[1.0, 70], [0.85, 52], [0.70, 36], [0.55, 22]];
+  let n = 0;
+  for (const [groesse, anzahl] of ringe) {
+    for (const p of gleichmaessig(anzahl)) {
+      teile.push({
+        text: WORTE[n % WORTE.length],
+        zx: W / 2 + p.x * s * groesse + zufall(-3, 3),
+        zy: H / 2 + p.y * s * groesse - 2 * s + zufall(-3, 3),
+        sx: zufall(0, W),
+        sy: zufall(0, H),
+        farbe: FARBEN[n % FARBEN.length],
+        px: klein * zufall(0.8, 1.15),
+        phase: zufall(0, Math.PI * 2)
+      });
+      n++;
+    }
+  }
+
+  // Zufällige Reihenfolge, damit es sich organisch zusammenbaut
+  teile.sort(() => Math.random() - 0.5);
+  const flug = 6;
+  teile.forEach((t, i) => {
+    t.delay = (i / teile.length) * (DAUER - flug);
+    t.flug = flug;
+  });
+  start = performance.now();
+}
+
+const sanft = x => 1 - Math.pow(1 - x, 3);
+
+function zeichnen(jetzt) {
+  const zeit = (jetzt - start) / 1000;
+  ctx.clearRect(0, 0, W, H);
+
+  // Herzschlag, sobald alles fertig ist
+  let puls = 1;
+  if (zeit > DAUER) {
+    const b = (zeit - DAUER) % 1.4;
+    puls = 1 + 0.045 * Math.exp(-((b - 0.15) ** 2) / 0.004)
+             + 0.03  * Math.exp(-((b - 0.42) ** 2) / 0.004);
+  }
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(puls, puls);
+  ctx.translate(-W / 2, -H / 2);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const t of teile) {
+    const f = Math.min(Math.max((zeit - t.delay) / t.flug, 0), 1);
+    if (f === 0) continue;
+    const e = sanft(f);
+    const x = t.sx + (t.zx - t.sx) * e;
+    const y = t.sy + (t.zy - t.sy) * e + Math.sin(zeit * 2 + t.phase) * 1.5;
+    ctx.globalAlpha = e * (0.82 + 0.18 * Math.sin(zeit * 3 + t.phase));
+    ctx.font = `${t.px}px "Segoe UI", sans-serif`;
+    ctx.fillStyle = t.farbe;
+    ctx.shadowColor = t.farbe;
+    ctx.shadowBlur = 8;
+    ctx.fillText(t.text, x, y);
+  }
+
+  // Großer Text in der Mitte
+  const m = Math.min(Math.max((zeit - DAUER + 1) / 2, 0), 1);
+  if (m > 0) {
+    let groesse = Math.min(W, H) * 0.065;
+    ctx.font = `italic bold ${groesse}px Georgia, serif`;
+    const maxBreite = Math.min(W / 37, H / 35) * 15;
+    const breite = ctx.measureText(MITTE).width;
+    if (breite > maxBreite) {
+      groesse *= maxBreite / breite;
+      ctx.font = `italic bold ${groesse}px Georgia, serif`;
+    }
+    ctx.globalAlpha = m;
+    ctx.fillStyle = "#fff";
+    ctx.shadowColor = "#ff2d6f";
+    ctx.shadowBlur = 25;
+    ctx.fillText(MITTE, W / 2, H / 2 - Math.min(W / 37, H / 35) * 2);
+  }
+
+  ctx.restore();
+  requestAnimationFrame(zeichnen);
+}
+
+window.addEventListener("resize", aufbauen);
+canvas.addEventListener("click", aufbauen);   // Klick = Neustart
+aufbauen();
+requestAnimationFrame(zeichnen);
+</script>
+</body>
+</html>
+
